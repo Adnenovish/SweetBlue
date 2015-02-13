@@ -1,13 +1,14 @@
 package com.idevicesinc.sweetblue;
 
-import java.util.UUID;
-
 import android.os.Handler;
 
-import com.idevicesinc.sweetblue.BleDeviceConfig.TimeoutRequestFilter.TimeoutRequestEvent;
 import com.idevicesinc.sweetblue.utils.Interval;
-import com.idevicesinc.sweetblue.utils.Uuids;
 
+
+/**
+ * 
+ * 
+ */
 abstract class PA_Task
 {
 	static interface I_StateListener
@@ -15,8 +16,11 @@ abstract class PA_Task
 		void onStateChange(PA_Task task, PE_TaskState state);
 	}
 	
-	private final BleDeviceConfig.TimeoutRequestFilter.TimeoutRequestEvent s_timeoutRequestEvent = new TimeoutRequestEvent();
+	static final double TIMEOUT_DEFAULT = BleManagerConfig.DEFAULT_TASK_TIMEOUT;
+	static final double TIMEOUT_CONNECTION = BleManagerConfig.DEFAULT_TASK_TIMEOUT;
 	
+	private 	  BleDevice m_device;
+	private		  BleServer m_server;
 	private 	  BleDevice m_device; 
 	private final BleManager m_manager;
 	
@@ -49,8 +53,6 @@ abstract class PA_Task
 	
 	protected final P_Logger m_logger;
 	
-	private int m_ordinal = -1; // until added to the queue and assigned an actual ordinal.
-	
 	private final Runnable m_executeRunnable = new Runnable()
 	{
 		@Override public void run()
@@ -63,19 +65,32 @@ abstract class PA_Task
 			}
 		}
 	};
-	
-	public PA_Task(BleDevice device, I_StateListener listener)
+
+    public PA_Task(BleServer server, I_StateListener listener)
+    {
+        this(server.getManager(), listener);
+
+        m_server = server;
+    }
+
+	public PA_Task(BleDevice device, double timeout, I_StateListener listener)
 	{
-		this(device.getManager(), listener);
+		this(device.getManager(), listener, timeout);
 		
 		m_device = device;
 	}
 	
 	public PA_Task(BleManager manager, I_StateListener listener)
 	{
+		this(manager, listener, BleDeviceConfig.DEFAULT_TASK_TIMEOUT);
+	}
+	
+	public PA_Task(BleManager manager, I_StateListener listener, double timeout)
+	{
 		m_device = null;
 		m_manager = manager;
 //		m_maxRetries = 0;
+		m_timeout = timeout;
 		m_logger = m_manager.getLogger();
 		m_timeCreated = System.currentTimeMillis();
 		
@@ -90,38 +105,6 @@ abstract class PA_Task
 		}
 	}
 	
-	protected abstract BleTask getTaskType();
-	
-	protected double getInitialTimeout()
-	{
-		final BleTask taskType = getTaskType();
-		
-		if( taskType != null )
-		{
-			final BleDevice device = getDevice() != null ? getDevice() : BleDevice.NULL;
-			
-			s_timeoutRequestEvent.init(getManager(), device, taskType, getCharUuid(), getDescUuid());
-			
-			return BleDeviceConfig.getTimeout(s_timeoutRequestEvent);
-		}
-		else
-		{
-			getManager().ASSERT(false, "BleTask type shouldn't be null.");
-			
-			return BleDeviceConfig.DefaultTimeoutRequestFilter.DEFAULT_TASK_TIMEOUT; // just a back-up, should never be invoked.
-		}
-	}
-	
-	protected /*virtual*/ UUID getCharUuid()
-	{
-		return Uuids.INVALID;
-	}
-	
-	protected /*virtual*/ UUID getDescUuid()
-	{
-		return Uuids.INVALID;
-	}
-	
 	void init()
 	{
 		setState(PE_TaskState.CREATED);
@@ -133,22 +116,15 @@ abstract class PA_Task
 		
 		m_state = newState;
 		
-		if( m_logger.isEnabled() )
+		if( m_state.isEndingState() && m_logger.isEnabled() )
 		{
-			if( m_state.isEndingState() )
+			String logText = this.toString();
+			if( m_queue != null )
 			{
-				String logText = this.toString();
-				if( m_queue != null )
-				{
-					logText += " - " + m_queue.getUpdateCount();
-				}
-				
-				m_logger.i(logText);
+				logText += " - " + m_queue.getUpdateCount();
 			}
-			else if (m_state == PE_TaskState.EXECUTING )
-			{
-				getQueue().print();
-			}
+			
+			m_logger.i(logText);
 		}
 		
 		if( m_stateListener != null )  m_stateListener.onStateChange(this, m_state);
@@ -159,15 +135,9 @@ abstract class PA_Task
 		return m_state;
 	}
 	
-	int getOrdinal()
-	{
-		return m_ordinal;
-	}
-	
 	void onAddedToQueue(P_TaskQueue queue)
 	{
 		m_queue = queue;
-		m_ordinal = getQueue().assignOrdinal();
 		setState(PE_TaskState.QUEUED);
 //		m_retryCount = 0;
 		m_updateCount = 0;
@@ -250,15 +220,9 @@ abstract class PA_Task
 		m_resetableExecuteStartTime = System.currentTimeMillis();
 //		m_retryCount = 0;
 		m_updateCount = 0;
-		m_timeout = getInitialTimeout();
 	}
 	
 	protected boolean isExecutable()
-	{
-		return true;
-	}
-	
-	protected boolean isArmable()
 	{
 		return true;
 	}
@@ -275,7 +239,7 @@ abstract class PA_Task
 	
 	void setEndingState(PE_TaskState endingState)
 	{
-		if( m_softlyCancelled )
+		if( m_softlyCancelled && endingState == PE_TaskState.SUCCEEDED )
 		{
 			endingState = PE_TaskState.SOFTLY_CANCELLED;
 		}
@@ -387,6 +351,11 @@ abstract class PA_Task
 		return m_device;
 	}
 	
+	public BleServer getServer()
+	{
+		return m_server;
+	}
+	
 	public BleManager getManager()
 	{
 		return m_manager;
@@ -451,6 +420,8 @@ abstract class PA_Task
 		String addition = getToStringAddition() != null ? " " + getToStringAddition() : "";
 		return name + "(" + m_state.name() + deviceEntry + addition + ")";
 	}
+	
+	
 	
 	public boolean executeOnSeperateThread()
 	{
