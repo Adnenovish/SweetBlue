@@ -46,6 +46,10 @@ public class BleDeviceConfig implements Cloneable
 	public static final int DEFAULT_RUNNING_AVERAGE_N					= 10;
 	public static final double DEFAULT_SCAN_KEEP_ALIVE					= DEFAULT_MINIMUM_SCAN_TIME*2.5;
 	
+	public static final double DEFAULT_RSSI_CONNECTION_THRESHOLD		= 5.0;
+	
+	public static final double DEFAULT_RSSI_CONNECTION_THRESHOLD_TIME	= 1.0;
+	
 	/**
 	 * Default value for {@link #rssiAutoPollRate}.
 	 */
@@ -889,6 +893,33 @@ public class BleDeviceConfig implements Cloneable
 	public Boolean useGattRefresh								= false;
 	
 	/**
+	 * Default is {@value #DEFAULT_RSSI_CONNECTION_THRESHOLD}% - If {@link BleDevice#getRssiPercent()} is below (not at, must be below)
+	 * this threshold for {@link #rssiAutoDisconnectThresholdTime} seconds then the {@link BleDevice} will forcibly disconnect itself. If you have
+	 * a {@link #reconnectRequestFilter_longTerm} set, the device will then go into {@link BleDeviceState#RECONNECTING_LONG_TERM}.
+	 * {@link ReconnectRequestFilter#onEvent(ReconnectRequestEvent)} will only be called once {@link BleDevice#getRssiPercent()} goes back above
+	 * {@link #rssiReconnectThreshold}%.
+	 * <br><br>
+	 * TIP: To disable this feature completely simply set this value to {@link Percent#ZERO} or <code>null</code>.
+	 * <br><br>
+	 * NOTE: The reason for this feature is that you can throw your device inside a fridge or something so you know for sure it will disconnect.
+	 * What can happen is that the RSSI shoots down but it takes a while to actually disconnect. My speculation is that Android tries to hold onto
+	 * the connection to see if it will come back. This is fine for some applications, but others may want snappier disconnect.
+	 */
+	public Percent rssiAutoDisconnectThreshold					= Percent.fromDouble(DEFAULT_RSSI_CONNECTION_THRESHOLD);
+	
+	/**
+	 * Default is same as #DEFAULT_RSSI_CONNECTION_THRESHOLD}% - Should usually be the same or higher than {@link #rssiAutoDisconnectThreshold}.
+	 * Please see {@link #rssiAutoDisconnectThreshold} for more information. If {@link #rssiAutoDisconnectThreshold} is disabled then
+	 * this config option is irrelevant.
+	 */
+	public Percent rssiReconnectThreshold						= Percent.fromDouble(DEFAULT_RSSI_CONNECTION_THRESHOLD);
+	
+	/**
+	 * Default is {@value #DEFAULT_RSSI_CONNECTION_THRESHOLD_TIME} - please see {@link #rssiAutoDisconnectThreshold} for more information.
+	 */
+	public Interval rssiAutoDisconnectThresholdTime				= Interval.secs(DEFAULT_RSSI_CONNECTION_THRESHOLD_TIME);
+	
+	/**
 	 * Default is {@link #DEFAULT_MINIMUM_SCAN_TIME} seconds - Undiscovery of devices must be
 	 * approximated by checking when the last time was that we discovered a device,
 	 * and if this time is greater than {@link #undiscoveryKeepAlive} then the device is undiscovered. However a scan
@@ -904,7 +935,7 @@ public class BleDeviceConfig implements Cloneable
 	public Interval	minScanTimeNeededForUndiscovery				= Interval.secs(DEFAULT_MINIMUM_SCAN_TIME);
 	
 	/**
-	 * Default is {@link #DEFAULT_SCAN_KEEP_ALIVE} seconds - If a device exceeds this amount of time since its
+	 * Default is {@value #DEFAULT_SCAN_KEEP_ALIVE} seconds - If a device exceeds this amount of time since its
 	 * last discovery then it is a candidate for being undiscovered.
 	 * The default for this option attempts to accommodate the worst Android phones (BLE-wise), which may make it seem
 	 * like it takes a long time to undiscover a device. You may want to configure this number based on the phone or
@@ -919,7 +950,7 @@ public class BleDeviceConfig implements Cloneable
 	public Interval	undiscoveryKeepAlive						= Interval.secs(DEFAULT_SCAN_KEEP_ALIVE);
 	
 	/**
-	 * Default is {@link #DEFAULT_RSSI_AUTO_POLL_RATE} - The rate at which a {@link BleDevice} will automatically poll for its {@link BleDevice#getRssi()} value
+	 * Default is {value #DEFAULT_RSSI_AUTO_POLL_RATE} seconds - The rate at which a {@link BleDevice} will automatically poll for its {@link BleDevice#getRssi()} value
 	 * after it's {@link BleDeviceState#CONNECTED}. You may also use {@link BleDevice#startRssiPoll(Interval, ReadWriteListener)} for more control and feedback.
 	 */
 	@Nullable(Prevalence.NORMAL)
