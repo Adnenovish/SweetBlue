@@ -2346,4 +2346,3 @@ public class BleManager
 		return m_stateTracker.toString();
 	}
 }
-hi
