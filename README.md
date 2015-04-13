@@ -1,9 +1,19 @@
-[![Build Status](http://75.144.199.157:7117/job/SweetBlue/badge/icon)](http://75.144.199.157:7117/job/SweetBlue/)
-[![Version](https://img.shields.io/badge/version-1.6.22-blue.svg)](https://img.shields.io/badge/version-1.6.22-blue.svg)
-
-**|** [Why?](#why) **|** [Features](#features) **|** [Getting Started](#getting-started) **|** [Licensing](#licensing) **|**
-
-<p align="center" style="margin-top:100px;"><br><a href="https://idevicesinc.com/sweetblue"><img src="https://github.com/iDevicesInc/SweetBlue/blob/master/scripts/assets/sweetblue_logo.png" /></a></p>
+<b>|</b>&nbsp;<a href='#why'>Why?</a>
+<b>|</b>&nbsp;<a href='#features'>Features</a>
+<b>|</b>&nbsp;<a href='#getting-started'>Getting Started</a>
+<b>|</b>&nbsp;<a href='#licensing'>Licensing</a>
+<b>|</b>
+<a href="http://75.144.199.157:7117/job/SweetBlue/">
+  <img align="right" src="https://img.shields.io/badge/version-1.26.10-blue.svg" />
+  <img align="right" src="https://github.com/iDevicesInc/SweetBlue/blob/master/scripts/assets/whitespace.bmp" />
+  <img align="right" src="http://75.144.199.157:7117/buildStatus/icon?job=SweetBlue Library"/>
+</a>
+<p align="center">
+  <br>
+  <a href="https://idevicesinc.com/sweetblue">
+    <img src="https://github.com/iDevicesInc/SweetBlue/blob/master/scripts/assets/sweetblue_logo.png" />
+  </a>
+</p>
 Why?
 ====
 
@@ -55,85 +65,85 @@ Features
 
 Getting Started
 ===============
- 1. If using **Eclipse**...
-  1. [Download](https://github.com/iDevicesInc/SweetBlue/releases) the latest release to a subfolder of your project such as `MyApp/libs/`.
-  2. Open the `Package Explorer` view.
-  3. Expand `MyApp/libs/sweetblue/`.
-  4. If building with source...
-      1. Right-click on the `src` folder.
-      2. Hover over `Build Path->`.
-      3. Click `Use as Source Folder`.
-  5. Else if building with JAR...
-      1. Expand the `jars` folder.
-      2. Right click on `sweetblue_{version}.jar`.
-      3. Hover over `Build Path->`.
-      4. Click `Add to Build Path`.
- 2. Else if using **Android Studio** or **Gradle**...
-  1. [Download](http://github.com/iDevicesInc/SweetBlue/releases) the latest release to a subfolder of your project such as `MyApp/src/main/lib/.`
-  2. Open the app module's `build.gradle` file.
-  3. If building with source, add the following to `sourceSets`:
- 
-    ```gradle
-    android {
-        ...
-        sourceSets {
-            ...
-            main.java.srcDirs += 'src/main/lib/sweetblue/src'
-        }
-    }
-    ```
+1. If using **Eclipse**...
+1. [Download](https://github.com/iDevicesInc/SweetBlue/releases) the latest release to a subfolder of your project such as `MyApp/libs/`.
+2. Open the `Package Explorer` view.
+3. Expand `MyApp/libs/sweetblue/`.
+4. If building with source...
+1. Right-click on the `src` folder.
+2. Hover over `Build Path->`.
+3. Click `Use as Source Folder`.
+5. Else if building with JAR...
+1. Expand the `jars` folder.
+2. Right click on `sweetblue_{version}.jar`.
+3. Hover over `Build Path->`.
+4. Click `Add to Build Path`.
+2. Else if using **Android Studio** or **Gradle**...
+1. [Download](http://github.com/iDevicesInc/SweetBlue/releases) the latest release to a subfolder of your project such as `MyApp/src/main/lib/.`
+2. Open the app module's `build.gradle` file.
+3. If building with source, add the following to `sourceSets`:
 
-  4. Else if building with JAR, add the following to `dependencies`:
+```gradle
+android {
+...
+sourceSets {
+...
+main.java.srcDirs += 'src/main/lib/sweetblue/src'
+}
+}
+```
 
-    ```gradle
-    dependencies {
-        ...
-        compile fileTree(dir: 'libs', include: '*.jar')
-    }
-    ```
+4. Else if building with JAR, add the following to `dependencies`:
 
- 3. Now add these to the root of `MyApp/AndroidManifest.xml`:
- 
-    ```xml
-    <uses-sdk android:minSdkVersion="18" android:targetSdkVersion="21" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
-    ```
-        
- 4. From your `Activity` or `Service` or `Application` instance, this is all it takes to discover a device, connect to it, and read a characteristic:
-    ```java
-    BleManager.get(this).startScan(new DiscoveryListener()
-    {
-    	@Override public void onEvent(DiscoveryEvent e)
-    	{
-    		if( e.was(LifeCycle.DISCOVERED) )
-    		{
-	    		e.device().connect(new StateListener()
-	    		{
-	    			@Override public void onEvent(StateEvent e)
-	    			{
-	    				if( e.didEnter(BleDeviceState.INITIALIZED) )
-	    				{
-	    					e.device().read(Uuids.BATTERY_LEVEL, new ReadWriteListener()
-	    					{
-	    						@Override public void onEvent(ReadWriteEvent e)
-	    						{
-	    							if( e.wasSuccess() )
-	    							{
-	    								Log.i("", "Battery level is " + e.data_byte() + "%");
-	    							}
-	    						}
-	    					});
-	    				}
-	    			}
-	    		});
-	    	}
-    	}
-    });
-    ```
+```gradle
+dependencies {
+...
+compile fileTree(dir: 'libs', include: '*.jar')
+}
+```
+
+3. Now add these to the root of `MyApp/AndroidManifest.xml`:
+
+```xml
+<uses-sdk android:minSdkVersion="18" android:targetSdkVersion="21" />
+<uses-permission android:name="android.permission.BLUETOOTH" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+<uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED" />
+<uses-permission android:name="android.permission.WAKE_LOCK" />
+<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+```
+
+4. From your `Activity` or `Service` or `Application` instance, this is all it takes to discover a device, connect to it, and read a characteristic:
+```java
+BleManager.get(this).startScan(new DiscoveryListener()
+{
+@Override public void onEvent(DiscoveryEvent e)
+{
+if( e.was(LifeCycle.DISCOVERED) )
+{
+e.device().connect(new StateListener()
+{
+@Override public void onEvent(StateEvent e)
+{
+if( e.didEnter(BleDeviceState.INITIALIZED) )
+{
+e.device().read(Uuids.BATTERY_LEVEL, new ReadWriteListener()
+{
+@Override public void onEvent(ReadWriteEvent e)
+{
+if( e.wasSuccess() )
+{
+Log.i("", "Battery level is " + e.data_byte() + "%");
+}
+}
+});
+}
+}
+});
+}
+}
+});
+```
 
 Licensing
 =========
