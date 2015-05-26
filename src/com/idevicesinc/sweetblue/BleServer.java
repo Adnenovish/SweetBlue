@@ -366,7 +366,6 @@ public class BleServer {
 		m_listeners = new P_BleServer_Listeners(this);
 		m_taskStateListener = m_listeners.m_taskStateListener;		
 		m_nativeWrapper = new P_NativeServerWrapper(this);
-//		m_taskStateListener = m_listeners.m_taskStateListener;
 	}
 	
 	/**

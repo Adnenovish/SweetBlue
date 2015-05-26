@@ -9,6 +9,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
@@ -741,9 +742,12 @@ public class BleManager
 	
 	private boolean m_isForegrounded = false;
 	private boolean m_triedToStartScanAfterResume = false;
-	
-	static BleManager s_instance = null;
-	
+
+    BleServer.StateListener m_defaultServerStateListener;
+    P_ServerManager m_serverMngr;
+
+	private static BleManager s_instance = null;
+
 	/**
 	 * Field for app to associate any data it wants with the singleton instance of this class
 	 * instead of having to subclass or manage associative hash maps or something.
@@ -1034,6 +1038,18 @@ public class BleManager
 		{
 			m_defaultDeviceStateListener = null;
 		}
+	}
+
+	/**
+	 * Convenience method to listen for all changes in {@link BleDeviceState} for all devices.
+	 * The listener provided will get called in addition to and after the listener, if any, provided
+	 * to {@link BleDevice#setListener_State(BleDevice.StateListener)}.
+	 *
+	 * @see BleDevice#setListener_State(BleDevice.StateListener)
+	 */
+	public void setListener_ServerState(BleServer.StateListener listener)
+	{
+		m_defaultServerStateListener = new P_WrappingServerStateListener(listener, m_mainThreadHandler, m_config.postCallbacksToMainThread);
 	}
 
 	/**
@@ -2352,5 +2368,11 @@ public class BleManager
 	@Override public String toString()
 	{
 		return m_stateTracker.toString();
+	}
+	public BleServer openBleServer( final List<BluetoothGattService> gattServices, BleServer.ReadOrWriteRequestListener listener ) {
+		BleServer bleServer = new BleServer( this );
+		bleServer.openGattServer( m_context, gattServices, listener );
+		m_serverMngr.add( bleServer );
+		return bleServer;
 	}
 }
