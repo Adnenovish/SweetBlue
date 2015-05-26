@@ -746,7 +746,7 @@ public class BleManager
     BleServer.StateListener m_defaultServerStateListener;
     P_ServerManager m_serverMngr;
 
-	private static BleManager s_instance = null;
+	static BleManager s_instance = null;
 
 	/**
 	 * Field for app to associate any data it wants with the singleton instance of this class
