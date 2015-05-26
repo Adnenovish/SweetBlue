@@ -180,6 +180,8 @@ public class BleServer {
 
         public void onNotificationSent(Result result);
 
+        public void onWriteRequest(Result result);
+
         /**
          * A value returned to {@link ResponseNotifyListener#onResponseOrNotifyComplete(Result)} by way of
          * {@link Result#status} that indicates success of the operation or the reason for its failure.
