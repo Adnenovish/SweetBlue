@@ -1,7 +1,5 @@
 package com.idevicesinc.sweetblue;
 
-import java.util.UUID;
-
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -18,6 +16,8 @@ import com.idevicesinc.sweetblue.BleServer.ReadOrWriteRequestListener.Status;
 import com.idevicesinc.sweetblue.BleServer.ReadOrWriteRequestListener.Target;
 import com.idevicesinc.sweetblue.BleServer.ReadOrWriteRequestListener.Type;
 import com.idevicesinc.sweetblue.utils.UpdateLoop;
+
+import java.util.UUID;
 
 public class P_BleServer_Listeners extends BluetoothGattServerCallback {
 
@@ -170,6 +170,8 @@ public class P_BleServer_Listeners extends BluetoothGattServerCallback {
     	try { 
         	final UUID uuid = characteristic.getUuid();
         	final ReadOrWriteRequestListener listener = m_server.getReadOrWriteRequestListener();
+			final Result result = new Result(m_server, device, characteristic.getUuid(), null, Type.WRITE, Target.CHARACTERISTIC, value, Status.SUCCESS, responseNeeded, requestId, offset);
+			listener.onWriteRequest(result);
     		m_logger.i(m_logger.charName(uuid));
     		
     		UpdateLoop updater = m_server.getManager().getUpdateLoop();
@@ -179,7 +181,7 @@ public class P_BleServer_Listeners extends BluetoothGattServerCallback {
     			@Override public void run_nested()
     			{
     				if ( responseNeeded ) {
-    					Response response = listener.onReadOrWriteRequest( new Result( m_server, device, characteristic.getUuid(), null, Type.WRITE, Target.CHARACTERISTIC, value, Status.SUCCESS, responseNeeded, requestId, offset ) );
+    					Response response = listener.onReadOrWriteRequest(result);
     					m_server.sendResponse( response );
     				}
     			}
