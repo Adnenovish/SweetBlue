@@ -173,11 +173,11 @@ class P_ServiceManager
 		
 		int property = getProperty(type);
 		
-		if( (char_native.getProperties() & property) == 0x0 )
+		if( (char_native.getProperties() & property) != 0x0 )
 		{
 			//TODO: Use correct gatt status even though we never reach gatt layer?
 			ReadWriteEvent result = new ReadWriteEvent(m_device, uuid, null, type, target, data, Status.OPERATION_NOT_SUPPORTED, gattStatus, 0.0, 0.0);
-			
+
 			return result;
 		}
 		
