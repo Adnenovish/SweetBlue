@@ -118,7 +118,539 @@ import static com.idevicesinc.sweetblue.BleManagerState.TURNING_ON;
  */
 public class BleManager
 {
-/*/*/*/*/*e final UpdateLoop.Callback m_updateLoopCallback = new UpdateLoop.Callback()
+	/**
+	 * Provide an implementation to {@link com.idevicesinc.sweetblue.BleManager#setListener_Discovery(com.idevicesinc.sweetblue.BleManager.DiscoveryListener)} to receive
+	 * callbacks when a device is discovered after calling various {@link com.idevicesinc.sweetblue.BleManager#startScan()}
+	 * or {@link com.idevicesinc.sweetblue.BleManager#startPeriodicScan(Interval, Interval)} methods. You can also provide this to various
+	 * overloads of {@link com.idevicesinc.sweetblue.BleManager#startScan()} and {@link com.idevicesinc.sweetblue.BleManager#startPeriodicScan(Interval, Interval)}.
+	 * <br><br>
+	 */
+	@com.idevicesinc.sweetblue.annotations.Lambda
+	public static interface DiscoveryListener
+	{
+		/**
+		 * Enumerates changes in the "discovered" state of a device.
+		 * Used at {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener.DiscoveryEvent#lifeCycle()}.
+		 */
+		public static enum LifeCycle
+		{
+			/**
+			 * Used when a device is discovered for the first time after
+			 * calling {@link com.idevicesinc.sweetblue.BleManager#startScan()} (or its overloads)
+			 * or {@link com.idevicesinc.sweetblue.BleManager#startPeriodicScan(Interval, Interval)}.
+			 */
+			DISCOVERED,
+			
+			/**
+			 * Used when a device is rediscovered after already being discovered at least once.
+			 */
+			REDISCOVERED,
+			
+			/**
+			 * Used when a device is "undiscovered" after being discovered at least once. There is no native equivalent
+			 * for this callback. Undiscovery is approximated with a timeout based on the last time we discovered a device.
+			 * Consequently you should expect that the callback will take some amount of time to receive after an
+			 * advertising device is turned off or goes out of range or what have you. It's generally not as fast as other
+			 * state changes like {@link BleDeviceState#DISCONNECTED} or getting {@link BleDeviceState#DISCOVERED} in the first place.
+			 *
+			 * @see BleDeviceConfig#minScanTimeNeededForUndiscovery
+			 * @see BleDeviceConfig#undiscoveryKeepAlive
+			 */
+			UNDISCOVERED;
+		}
+		
+		/**
+		 * Struct passed to {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener#onEvent(com.idevicesinc.sweetblue.BleManager.DiscoveryListener.DiscoveryEvent)}.
+		 */
+		@Immutable
+		public static class DiscoveryEvent
+		{
+			/**
+			 * The {@link com.idevicesinc.sweetblue.BleManager} which is currently {@link BleManagerState#SCANNING}.
+			 */
+			public BleManager manager(){  return m_manager;  }
+			private final BleManager m_manager;
+			
+			/**
+			 * The device in question.
+			 */
+			public BleDevice device(){  return m_device;  }
+			private final BleDevice m_device;
+			
+			/**
+			 * The discovery {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener.LifeCycle} that the device has undergone.
+			 */
+			public LifeCycle lifeCycle(){  return m_lifeCycle;  }
+			private final LifeCycle m_lifeCycle;
+			
+			public DiscoveryEvent(BleManager manager, BleDevice device, LifeCycle lifeCycle)
+			{
+				m_manager = manager;
+				m_device = device;
+				m_lifeCycle = lifeCycle;
+			}
+			
+			/**
+			 * Forwards {@link BleDevice#getRssi()}.
+			 */
+			public int rssi()
+			{
+				return device().getRssi();
+			}
+			
+			/**
+			 * Forwards {@link BleDevice#getRssiPercent()}.
+			 */
+			public Percent rssi_percent()
+			{
+				return device().getRssiPercent();
+			}
+			
+			/**
+			 * Convenience method for checking equality of given {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener.LifeCycle} and {@link #lifeCycle()}.
+			 */
+			public boolean was(LifeCycle lifeCycle)
+			{
+				return lifeCycle == lifeCycle();
+			}
+			
+			@Override public String toString()
+			{
+				return Utils.toString
+				(
+					this.getClass(),
+					"device",				device().getName_debug(),
+					"lifeCycle",			lifeCycle(),
+					"rssi",					rssi(),
+					"rssi_percent",			rssi_percent()
+				);
+			}
+		}
+		
+		/**
+		 * Called when the discovery lifecycle of a device is updated.
+		 * <br><br> 
+		 * TIP: Take a look at {@link BleDevice#getLastDisconnectIntent()}. If it is {@link utils.State.ChangeIntent#UNINTENTIONAL}
+		 * then from a user-experience perspective it's most often best to automatically connect without user confirmation.
+		 */
+		void onEvent(final DiscoveryEvent e);
+	}
+
+	/**
+	 * Provide an implementation to {@link com.idevicesinc.sweetblue.BleManager#setListener_State(com.idevicesinc.sweetblue.BleManager.StateListener)} to receive callbacks
+	 * when the {@link com.idevicesinc.sweetblue.BleManager} undergoes a {@link BleManagerState} change.
+	 */
+	@com.idevicesinc.sweetblue.annotations.Lambda
+	public static interface StateListener
+	{
+		/**
+		 * Subclass that adds the manager field.
+		 */
+		@Immutable
+		public static class StateEvent extends State.ChangeEvent<BleManagerState>
+		{
+			/**
+			 * The manager undergoing the state change.
+			 */
+			public BleManager manager(){  return m_manager;  }
+			private final BleManager m_manager;
+			
+			StateEvent(final BleManager manager, final int oldStateBits, final int newStateBits, final int intentMask)
+			{
+				super(oldStateBits, newStateBits, intentMask);
+				
+				this.m_manager = manager;
+			}
+			
+			@Override public String toString()
+			{
+				return Utils.toString
+				(
+					this.getClass(),
+					"entered",			Utils.toString(enterMask(),		BleManagerState.VALUES()),
+					"exited",			Utils.toString(exitMask(),		BleManagerState.VALUES()),
+					"current",			Utils.toString(newStateBits(),	BleManagerState.VALUES())
+				);
+			}
+		}
+		
+		/**
+		 * Called when the manager's abstracted {@link BleManagerState} changes.
+		 */
+		void onEvent(final StateEvent e);
+	}
+
+	/**
+	 * Provide an implementation to {@link com.idevicesinc.sweetblue.BleManager#setListener_NativeState(com.idevicesinc.sweetblue.BleManager.NativeStateListener)} to receive callbacks
+	 * when the {@link com.idevicesinc.sweetblue.BleManager} undergoes a *native* {@link BleManagerState} change. This is similar to {@link com.idevicesinc.sweetblue.BleManager.StateListener}
+	 * but reflects what is going on in the actual underlying stack, which may lag slightly behind the
+	 * abstracted state reflected by {@link com.idevicesinc.sweetblue.BleManager.StateListener}. Most apps will not find this callback useful.
+	 */
+	@Advanced
+	@com.idevicesinc.sweetblue.annotations.Lambda
+	public static interface NativeStateListener
+	{
+		/**
+		 * Class declared here to be make it implicitly imported for overrides.
+		 */
+		@Advanced
+		@Immutable
+		public static class NativeStateEvent extends StateListener.StateEvent
+		{
+			NativeStateEvent(final BleManager manager, final int oldStateBits, final int newStateBits, final int intentMask)
+			{
+				super(manager, oldStateBits, newStateBits, intentMask);
+			}
+		}
+		
+		/**
+		 * Called when the manager's native bitwise {@link BleManagerState} changes. As many bits as possible are flipped at the same time.
+		 */
+		@Advanced
+		void onEvent(final NativeStateEvent e);
+	}
+
+	/**
+	 * Provide an implementation to {@link com.idevicesinc.sweetblue.BleManager#setListener_UhOh(com.idevicesinc.sweetblue.BleManager.UhOhListener)}
+	 * to receive a callback when an {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} occurs.
+	 *
+	 * @see com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh
+	 */
+	@com.idevicesinc.sweetblue.annotations.Lambda
+	public static interface UhOhListener
+	{
+		/**
+		 * An UhOh is a warning about an exceptional (in the bad sense) and unfixable problem with the underlying stack that
+		 * the app can warn its user about. It's kind of like an {@link Exception} but they can be so common
+		 * that using {@link Exception} would render this library unusable without a rat's nest of try/catches.
+		 * Instead you implement {@link com.idevicesinc.sweetblue.BleManager.UhOhListener} to receive them. Each {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} has a {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh#getRemedy()}
+		 * that suggests what might be done about it.
+		 * 
+		 * @see com.idevicesinc.sweetblue.BleManager.UhOhListener
+		 * @see com.idevicesinc.sweetblue.BleManager#setListener_UhOh(com.idevicesinc.sweetblue.BleManager.UhOhListener)
+		 */
+		public enum UhOh
+		{
+			/**
+			 * A {@link BleTask#BOND} operation timed out. This can happen a lot with the Galaxy Tab 4, and doing {@link com.idevicesinc.sweetblue.BleManager#reset()} seems to fix it.
+			 * SweetBlue does as much as it can to work around the issue that causes bond timeouts, but some might still slip through.
+			 */
+			BOND_TIMED_OUT,
+			
+			/**
+			 * A {@link BleDevice#read(java.util.UUID, BleDevice.ReadWriteListener)}
+			 * took longer than timeout set by {@link BleDeviceConfig#timeoutRequestFilter}.
+			 * You will also get a {@link BleDevice.ReadWriteListener.ReadWriteEvent} with {@link BleDevice.ReadWriteListener.Status#TIMED_OUT}
+			 * but a timeout is a sort of fringe case that should not regularly happen.
+			 */
+			READ_TIMED_OUT,
+			
+			/**
+			 * A {@link BleDevice#read(java.util.UUID, BleDevice.ReadWriteListener)} returned with a <code>null</code>
+			 * characteristic value. The <code>null</code> value will end up as an empty array in {@link BleDevice.ReadWriteListener.ReadWriteEvent#data}
+			 * so app-land doesn't have to do any special <code>null</code> handling.
+			 */
+			READ_RETURNED_NULL,
+			
+			/**
+			 * Similar to {@link #READ_TIMED_OUT} but for {@link BleDevice#write(java.util.UUID, byte[])}.
+			 */
+			WRITE_TIMED_OUT,
+			
+			/**
+			 * When the underlying stack meets a race condition where {@link android.bluetooth.BluetoothAdapter#getState()} does not
+			 * match the value provided through {@link android.bluetooth.BluetoothAdapter#ACTION_STATE_CHANGED} with {@link android.bluetooth.BluetoothAdapter#EXTRA_STATE}.
+			 */
+			INCONSISTENT_NATIVE_BLE_STATE,
+			
+			/**
+			 * A {@link BleDevice} went from {@link BleDeviceState#BONDING} to {@link BleDeviceState#UNBONDED}.
+			 * UPDATE: This can happen under normal circumstances, so not listing it as an uh oh for now.
+			 */
+//			WENT_FROM_BONDING_TO_UNBONDED,
+			
+			/**
+			 * A {@link android.bluetooth.BluetoothGatt#discoverServices()} operation returned two duplicate services. Not the same instance
+			 * necessarily but the same UUID.
+			 */
+			DUPLICATE_SERVICE_FOUND,
+			
+			/**
+			 * A {@link android.bluetooth.BluetoothGatt#discoverServices()} operation returned a service instance that we already received before
+			 * after disconnecting and reconnecting.
+			 */
+			OLD_DUPLICATE_SERVICE_FOUND,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} failed for an unknown reason. The library is now using
+			 * {@link android.bluetooth.BluetoothAdapter#startDiscovery()} instead.
+			 * 
+			 * @see BleManagerConfig#revertToClassicDiscoveryIfNeeded
+			 */
+			START_BLE_SCAN_FAILED__USING_CLASSIC,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothGatt#getConnectionState(BluetoothDevice)} says we're connected but we never tried to connect in the first place.
+			 * My theory is that this can happen on some phones when you quickly restart the app and the stack doesn't have 
+			 * a chance to disconnect from the device entirely. 
+			 */
+			CONNECTED_WITHOUT_EVER_CONNECTING,
+			
+			/**
+			 * Similar in concept to {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh#RANDOM_EXCEPTION} but used when {@link android.os.DeadObjectException} is thrown.
+			 */
+			DEAD_OBJECT_EXCEPTION,
+			
+			/**
+			 * The underlying native BLE stack enjoys surprising you with random exceptions. Every time a new one is discovered
+			 * it is wrapped in a try/catch and this {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} is dispatched.
+			 */
+			RANDOM_EXCEPTION,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} failed and {@link BleManagerConfig#revertToClassicDiscoveryIfNeeded} is <code>false</code>.
+			 * 
+			 * @see BleManagerConfig#revertToClassicDiscoveryIfNeeded
+			 */
+			START_BLE_SCAN_FAILED,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} failed and {@link BleManagerConfig#revertToClassicDiscoveryIfNeeded} is <code>true</code>
+			 * so we try {@link android.bluetooth.BluetoothAdapter#startDiscovery()} but that also fails...fun!
+			 */
+			CLASSIC_DISCOVERY_FAILED,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothGatt#discoverServices()} failed right off the bat and returned false.
+			 */
+			SERVICE_DISCOVERY_IMMEDIATELY_FAILED,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothAdapter#disable()}, through {@link com.idevicesinc.sweetblue.BleManager#turnOff()}, is failing to complete.
+			 * We always end up back at {@link android.bluetooth.BluetoothAdapter#STATE_ON}.
+			 */
+			CANNOT_DISABLE_BLUETOOTH,
+			
+			/**
+			 * {@link android.bluetooth.BluetoothAdapter#enable()}, through {@link com.idevicesinc.sweetblue.BleManager#turnOn()}, is failing to complete.
+			 * We always end up back at {@link android.bluetooth.BluetoothAdapter#STATE_OFF}. Opposite problem of {@link #CANNOT_DISABLE_BLUETOOTH}
+			 */
+			CANNOT_ENABLE_BLUETOOTH,
+			
+			/**
+			 * Just a blanket case for when the library has to completely shrug its shoulders.
+			 */
+			UNKNOWN_BLE_ERROR;
+			
+			/**
+			 * Returns the {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.Remedy} for this {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh}.
+			 */
+			public Remedy getRemedy()
+			{
+				if( this.ordinal() >= CANNOT_DISABLE_BLUETOOTH.ordinal() )
+				{
+					return Remedy.RESTART_PHONE;
+				}
+				else if( this.ordinal() >= START_BLE_SCAN_FAILED.ordinal() )
+				{
+					return Remedy.RESET_BLE;
+				}
+				else
+				{
+					return Remedy.WAIT_AND_SEE;
+				}
+			}
+		}
+		
+		/**
+		 * The suggested remedy for each {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh}. This can be used as a proxy for the severity
+		 * of the issue.
+		 */
+		public static enum Remedy
+		{
+			/**
+			 * Nothing you can really do, hopefully the library can soldier on.
+			 */
+			WAIT_AND_SEE,
+			
+			/**
+			 * Calling {@link com.idevicesinc.sweetblue.BleManager#reset()} is probably in order.
+			 * 
+			 * @see com.idevicesinc.sweetblue.BleManager#reset()
+			 */
+			RESET_BLE,
+			
+			/**
+			 * Might want to notify your user that a phone restart is in order.
+			 */
+			RESTART_PHONE;
+		}
+		
+		/**
+		 * Struct passed to {@link com.idevicesinc.sweetblue.BleManager.UhOhListener#onEvent(com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOhEvent)}.
+		 */
+		@Immutable
+		public static class UhOhEvent
+		{
+			/**
+			 * The manager associated with the {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOhEvent}
+			 */
+			public BleManager manager(){  return m_manager;  }
+			private final BleManager m_manager;
+			
+			/**
+			 * Returns the type of {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} that occurred.
+			 */
+			public UhOh uhOh(){  return m_uhOh;  }
+			private final UhOh m_uhOh;
+			
+			/**
+			 * Forwards {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh#getRemedy()}.
+			 */
+			public Remedy remedy(){  return uhOh().getRemedy();  };
+			
+			UhOhEvent(BleManager manager, UhOh uhoh)
+			{
+				m_manager = manager;
+				m_uhOh = uhoh;
+			}
+			
+			@Override public String toString()
+			{
+				return Utils.toString
+				(
+					this.getClass(),
+					"uhOh",			uhOh(),
+					"remedy",		remedy()
+				);
+			}
+		}
+		
+		/**
+		 * Run for the hills.
+		 */
+		void onEvent(final UhOhEvent e);
+	}
+
+	/**
+	 * Provide an implementation to {@link com.idevicesinc.sweetblue.BleManager#reset(com.idevicesinc.sweetblue.BleManager.ResetListener)}
+	 * to be notified when a reset operation is complete.
+	 *
+	 * @see com.idevicesinc.sweetblue.BleManager#reset(com.idevicesinc.sweetblue.BleManager.ResetListener)
+	 */
+	@com.idevicesinc.sweetblue.annotations.Lambda
+	public static interface ResetListener
+	{
+		/**
+		 * Enumeration of the progress of the reset.
+		 * More entries will be added in the future.
+		 */
+		public static enum Progress
+		{
+			/**
+			 * The reset has completed successfully.
+			 */
+			COMPLETED;
+		}
+		
+		/**
+		 * Struct passed to {@link com.idevicesinc.sweetblue.BleManager.ResetListener#onEvent(com.idevicesinc.sweetblue.BleManager.ResetListener.ResetEvent)}.
+		 */
+		@Immutable
+		public static class ResetEvent
+		{
+			/**
+			 * The {@link com.idevicesinc.sweetblue.BleManager} the reset was applied to.
+			 */
+			public BleManager manager(){  return m_manager;  }
+			private final BleManager m_manager;
+			
+			/**
+			 * The progress of the reset.
+			 */
+			public Progress progress(){  return m_progress;  }
+			private final Progress m_progress;
+			
+			ResetEvent(BleManager manager, Progress progress)
+			{
+				m_manager = manager;
+				m_progress = progress;
+			}
+			
+			@Override public String toString()
+			{
+				return Utils.toString
+				(
+					this.getClass(),
+					"progress",		progress()
+				);
+			}
+		}
+		
+		/**
+		 * The reset event, for now only fired when the reset is completed. Hopefully the bluetooth stack is OK now.
+		 */
+		void onEvent(final ResetEvent e);
+	}
+
+	/**
+	 * Mostly only for SweetBlue library developers. Provide an implementation to
+	 * {@link com.idevicesinc.sweetblue.BleManager#setListener_Assert(com.idevicesinc.sweetblue.BleManager.AssertListener)} to be notified whenever
+	 * an assertion fails through {@link com.idevicesinc.sweetblue.BleManager#ASSERT(boolean, String)}.
+	 */
+	@Advanced
+	@com.idevicesinc.sweetblue.annotations.Lambda
+	public static interface AssertListener
+	{
+		/**
+		 * Struct passed to {@link com.idevicesinc.sweetblue.BleManager.AssertListener#onEvent(com.idevicesinc.sweetblue.BleManager.AssertListener.AssertEvent)}.
+		 */
+		@Immutable
+		public static class AssertEvent
+		{
+			/**
+			 * The {@link com.idevicesinc.sweetblue.BleManager} instance for your application.
+			 */
+			public BleManager manager(){  return m_manager;  }
+			private final BleManager m_manager;
+			
+			/**
+			 * Message associated with the assert, or an empty string.
+			 */
+			public String message(){  return m_message;  }
+			private final String m_message;
+			
+			/**
+			 * Stack trace leading up to the assert.
+			 */
+			public StackTraceElement[] stackTrace(){  return m_stackTrace;  }
+			private final StackTraceElement[] m_stackTrace;
+			
+			AssertEvent(BleManager manager, String message, StackTraceElement[] stackTrace)
+			{
+				m_manager = manager;
+				m_message = message;
+				m_stackTrace = stackTrace;
+			}
+			
+			@Override public String toString()
+			{
+				return Utils.toString
+				(
+					this.getClass(),
+					"message",			message(),
+					"stackTrace",		stackTrace()
+				);
+			}
+		}
+		
+		/**
+		 * Provides additional info about the circumstances surrounding the assert.
+		 */
+		void onEvent(final AssertEvent e);
+	}
+
+	private final UpdateLoop.Callback m_updateLoopCallback = new UpdateLoop.Callback()
 	{
 		@Override public void onUpdate(double timestep)
 		{
@@ -217,7 +749,7 @@ public class BleManager
 	private boolean m_triedToStartScanAfterResume = false;
 
     BleServer.StateListener m_defaultServerStateListener;
-	final P_ServerManager m_serverMngr;
+    final P_ServerManager m_serverMngr;
 
 	static BleManager s_instance = null;
 
@@ -254,8 +786,8 @@ public class BleManager
 		m_taskQueue = new P_TaskQueue(this);
 		m_crashResolver = new P_BluetoothCrashResolver(m_context);
 		m_deviceMngr = new P_DeviceManager(this);
-		m_deviceMngr_cache = new P_DeviceManager(this);
 		m_serverMngr = new P_ServerManager(this);
+		m_deviceMngr_cache = new P_DeviceManager(this);
 		m_listeners = new P_BleManager_Listeners(this);
 
 		initConfigDependentMembers();
@@ -1750,250 +2282,17 @@ public class BleManager
 	}
 
 	/**
-	 * 	/**
-	 * Provide an implementation to {@link com.idevicesinc.sweetblue.BleManager#setListener_Discovery(com.idevicesinc.sweetblue.BleManager.DiscoveryListener)} to receive
-	 * callbacks when a device is discovered after calling various {@link com.idevicesinc.sweetblue.BleManager#startScan()}
-	 * or {@link com.idevicesinc.sweetblue.BleManager#startPeriodicScan(Interval, Interval)} methods. You can also provide this to various
-	 * overloads of {@link com.idevicesinc.sweetblue.BleManager#startScan()} and {@link com.idevicesinc.sweetblue.BleManager#startPeriodicScan(Interval, Interval)}.
-	 * <br><br>
-	 */
-	@com.idevicesinc.sweetblue.annotations.Lambda
-	public static interface DiscoveryListener {
-		**
-				*
-		Called when
-		the discovery
-		lifecycle of
-		a device
-		is updated
-		.
-				*<br><br>
-		*TIP:
-		Take a
-		look at
-
-		{
-			@link BleDevice#getLastDisconnectIntent()
-		}
-
-		.
-		If it
-		is
-
-		{
-			@link utils.State.ChangeIntent#UNINTENTIONAL
-		}
-
-		*
-		then from
-		a user
-		-
-		experience perspective
-		it's most often best to automatically connect without user confirmation.
-				*/
-
-		void onEvent(final DiscoveryEvent e);
-	}
-
-	/**
-	 * Enumerates changes in the "discovered" state of a device.
-	 * Used at {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener.DiscoveryEvent#lifeCycle()}.
-	 */
-	public static enum LifeCycle {
-		/**
-		 * Used when a device is discovered for the first time after
-		 * calling {@link com.idevicesinc.sweetblue.BleManager#startScan()} (or its overloads)
-		 * or {@link com.idevicesinc.sweetblue.BleManager#startPeriodicScan(Interval, Interval)}.
-		 */
-		DISCOVERED,
-
-		/**
-		 * Used when a device is rediscovered after already being discovered at least once.
-		 */
-		REDISCOVERED,
-
-		/**
-		 * Used when a device is "undiscovered" after being discovered at least once. There is no native equivalent
-		 * for this callback. Undiscovery is approximated with a timeout based on the last time we discovered a device.
-		 * Consequently you should expect that the callback will take some amount of time to receive after an
-		 * advertising device is turned off or goes out of range or what have you. It's generally not as fast as other
-		 * state changes like {@link BleDeviceState#DISCONNECTED} or getting {@link BleDeviceState#DISCOVERED} in the first place.
-		 *
-		 * @see BleDeviceConfig#minScanTimeNeededForUndiscovery
-		 * @see BleDeviceConfig#undiscoveryKeepAlive
-		 */
-		UNDISCOVERED;
-	}
-
-	/
-
-	/**
-	 * Struct passed to {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener#onEvent(com.idevicesinc.sweetblue.BleManager.DiscoveryListener.DiscoveryEvent)}.
-	 */
-	@Immutable
-	public static class DiscoveryEvent {
-		private final BleManager m_manager;
-		private final BleDevice m_device;
-		private final LifeCycle m_lifeCycle;
-
-		public DiscoveryEvent(BleManager manager, BleDevice device, LifeCycle lifeCycle) {
-			m_manager = manager;
-			m_device = device;
-			m_lifeCycle = lifeCycle;
-		}
-
-		/**
-		 * The {@link com.idevicesinc.sweetblue.BleManager} which is currently {@link BleManagerState#SCANNING}.
-		 */
-		public BleManager manager() {
-			return m_manager;
-		}
-
-		/**
-		 * The device in question.
-		 */
-		public BleDevice device() {
-			return m_device;
-		}
-
-		/**
-		 * The discovery {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener.LifeCycle} that the device has undergone.
-		 */
-		public LifeCycle lifeCycle() {
-			return m_lifeCycle;
-		}
-
-		/**
-		 * Forwards {@link BleDevice#getRssi()}.
-		 */
-		public int rssi() {
-			return device().getRssi();
-		}
-
-		/**
-		 * Forwards {@link BleDevice#getRssiPercent()}.
-		 */
-		public Percent rssi_percent() {
-			return device().getRssiPercent();
-		}
-
-		/**
-		 * Convenience method for checking equality of given {@link com.idevicesinc.sweetblue.BleManager.DiscoveryListener.LifeCycle} and {@link #lifeCycle()}.
-		 */
-		public boolean was(LifeCycle lifeCycle) {
-			return lifeCycle == lifeCycle();
-		}
-
-		@Override
-		public String toString() {
-			return Utils.toString
-					(
-							this.getClass(),
-							"device", device().getName_debug(),
-							"lifeCycle", lifeCycle(),
-							"rssi", rssi(),
-							"rssi_percent", rssi_percent()
-					);
-		}
-	}
-
-
-	This method
-	is made
-	public in case
-	you want
-	to tie
-	the library
-	in to
-	an update
-	loop
+	 * This method is made public in case you want to tie the library in to an update loop
 	 * from another codebase. Generally you should leave {@link BleManagerConfig#autoUpdateRate}
-	 * alone and let the library handle
-	the calling
-	of this method.
-	*/
-
+	 * alone and let the library handle the calling of this method.
+	 */
 	@Advanced
-	public void update(final double timeStep_seconds) {
+	public void update(final double timeStep_seconds)
+	{
 		update_synchronized(timeStep_seconds);
 	}
 
-	private *
-		*
-	Provide an
-	implementation to
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager#
-		setListener_State(com.idevicesinc.sweetblue.BleManager.StateListener)
-	}
-
-	to receive
-	callbacks
-	*
-	when the
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager
-	}
-
-	undergoes a
-
-	{
-		@link BleManagerState
-	}
-
-	change.
-	*/
-
-	@com.idevicesinc.sweetblue.annotations.Lambda
-	public static interface StateListener {
-		/**
-		 * Called when the manager's abstracted {@link BleManagerState} changes.
-		 */
-		void onEvent(final StateEvent e);
-	}
-
-	/
-			**
-			*
-	Subclass that
-	adds the
-	manager field
-	.
-			*/
-
-	@Immutable
-	public static class StateEvent extends State.ChangeEvent<BleManagerState> {
-		private final BleManager m_manager;
-
-		StateEvent(final BleManager manager, final int oldStateBits, final int newStateBits, final int intentMask) {
-			super(oldStateBits, newStateBits, intentMask);
-
-			this.m_manager = manager;
-		}
-
-		/**
-		 * The manager undergoing the state change.
-		 */
-		public BleManager manager() {
-			return m_manager;
-		}
-
-		@Override
-		public String toString() {
-			return Utils.toString
-					(
-							this.getClass(),
-							"entered", Utils.toString(enterMask(), BleManagerState.VALUES()),
-							"exited", Utils.toString(exitMask(), BleManagerState.VALUES()),
-					"current",			Utils.toString(newStateBits(),	BleManagerState.VALUES())
-				);
-			}
-		}
-
-
-	void update_synchronized(final double timeStep)
+	private void update_synchronized(final double timeStep)
 	{
 		m_uhOhThrottler.update(timeStep);
 		m_taskQueue.update(timeStep);
@@ -2050,367 +2349,20 @@ public class BleManager
 
 		if( scanTask != null )
 		{
-			if( scanTask.getState() == PE_TaskState.ARMED || scanTask.getState() == PE_TaskState.EXECUTING) {
+			if( scanTask.getState() == PE_TaskState.ARMED || scanTask.getState() == PE_TaskState.EXECUTING )
+			{
 				tryPurgingStaleDevices(scanTask.getTotalTimeExecuting());
 			}
 		}
 	}
 
-	private *
-		*
-	Provide an
-	implementation to
-
+	private boolean doAutoScan()
 	{
-		@link com.idevicesinc.sweetblue.BleManager#
-		setListener_NativeState(com.idevicesinc.sweetblue.BleManager.NativeStateListener)
-	}
-
-	to receive
-	callbacks
-	*
-	when the
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager
-	}
-
-	undergoes a
-	*native *
-
-	{
-		@link BleManagerState
-	}
-
-	change.This is
-	similar to
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager.StateListener
-	}
-
-	*
-	but reflects
-	what is
-	going on
-	in the
-	actual underlying
-	stack,
-	which may
-	lag slightly
-	behind the
-	*
-	abstracted state
-	reflected by
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager.StateListener
-	}
-
-	.
-	Most apps
-	will not
-	find this
-	callback useful
-	.
-			*/
-
-	@Advanced
-	@com.idevicesinc.sweetblue.annotations.Lambda
-	public static interface NativeStateListener {
-		/**
-		 * Called when the manager's native bitwise {@link BleManagerState} changes. As many bits as possible are flipped at the same time.
-		 */
-		@Advanced
-		void onEvent(final NativeStateEvent e);
-	}
-
-	/
-			**
-			*
-	Class declared
-	here to
-	be make
-	it implicitly
-	imported for overrides.
-	*/
-
-	@Advanced
-	@Immutable
-	public static class NativeStateEvent extends StateListener.StateEvent {
-		NativeStateEvent(final BleManager manager, final int oldStateBits, final int newStateBits, final int intentMask)
-			{
-				super(manager, oldStateBits, newStateBits, intentMask);
-			}
-	}
-
-
-	boolean doAutoScan() {
 		return m_config.autoScanDuringOta || !m_deviceMngr.hasDevice(BleDeviceState.PERFORMING_OTA);
 	}
 
-	void uhO
-	*
-			*
-	Provide an
-	implementation to
-
+	void uhOh(UhOh reason)
 	{
-		@link com.idevicesinc.sweetblue.BleManager#
-		setListener_UhOh(com.idevicesinc.sweetblue.BleManager.UhOhListener)
-	}
-
-	*
-	to receive
-	a callback
-	when an
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh
-	}
-
-	occurs.
-	*
-			*
-	@see
-	com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh
-	*/
-
-	@com.idevicesinc.sweetblue.annotations.Lambda
-	public static interface UhOhListener {
-		/**
-		 * Run for the hills.
-		 */
-		void onEvent(final UhOhEvent e);
-	}
-
-	/**
-	 * An UhOh is a warning about an exceptional (in the bad sense) and unfixable problem with the underlying stack that
-	 * the app can warn its user about. It's kind of like an {@link Exception} but they can be so common
-	 * that using {@link Exception} would render this library unusable without a rat's nest of try/catches.
-	 * Instead you implement {@link com.idevicesinc.sweetblue.BleManager.UhOhListener} to receive them. Each {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} has a {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh#getRemedy()}
-	 * that suggests what might be done about it.
-	 *
-	 * @see com.idevicesinc.sweetblue.BleManager.UhOhListener
-	 * @see com.idevicesinc.sweetblue.BleManager#setListener_UhOh(com.idevicesinc.sweetblue.BleManager.UhOhListener)
-	 */
-	public enum UhOh {
-		/**
-		 * A {@link BleTask#BOND} operation timed out. This can happen a lot with the Galaxy Tab 4, and doing {@link com.idevicesinc.sweetblue.BleManager#reset()} seems to fix it.
-		 * SweetBlue does as much as it can to work around the issue that causes bond timeouts, but some might still slip through.
-		 */
-		BOND_TIMED_OUT,
-
-		/**
-		 * A {@link BleDevice#read(java.util.UUID, BleDevice.ReadWriteListener)}
-		 * took longer than timeout set by {@link BleDeviceConfig#timeoutRequestFilter}.
-		 * You will also get a {@link BleDevice.ReadWriteListener.ReadWriteEvent} with {@link BleDevice.ReadWriteListener.Status#TIMED_OUT}
-		 * but a timeout is a sort of fringe case that should not regularly happen.
-		 */
-		READ_TIMED_OUT,
-
-		/**
-		 * A {@link BleDevice#read(java.util.UUID, BleDevice.ReadWriteListener)} returned with a <code>null</code>
-		 * characteristic value. The <code>null</code> value will end up as an empty array in {@link BleDevice.ReadWriteListener.ReadWriteEvent#data}
-		 * so app-land doesn't have to do any special <code>null</code> handling.
-		 */
-		READ_RETURNED_NULL,
-
-		/**
-		 * Similar to {@link #READ_TIMED_OUT} but for {@link BleDevice#write(java.util.UUID, byte[])}.
-		 */
-		WRITE_TIMED_OUT,
-
-		/**
-		 * When the underlying stack meets a race condition where {@link android.bluetooth.BluetoothAdapter#getState()} does not
-		 * match the value provided through {@link android.bluetooth.BluetoothAdapter#ACTION_STATE_CHANGED} with {@link android.bluetooth.BluetoothAdapter#EXTRA_STATE}.
-		 */
-		INCONSISTENT_NATIVE_BLE_STATE,
-
-		/**
-		 * A {@link BleDevice} went from {@link BleDeviceState#BONDING} to {@link BleDeviceState#UNBONDED}.
-		 * UPDATE: This can happen under normal circumstances, so not listing it as an uh oh for now.
-		 */
-//			WENT_FROM_BONDING_TO_UNBONDED,
-
-		/**
-		 * A {@link android.bluetooth.BluetoothGatt#discoverServices()} operation returned two duplicate services. Not the same instance
-		 * necessarily but the same UUID.
-		 */
-		DUPLICATE_SERVICE_FOUND,
-
-		/**
-		 * A {@link android.bluetooth.BluetoothGatt#discoverServices()} operation returned a service instance that we already received before
-		 * after disconnecting and reconnecting.
-		 */
-		OLD_DUPLICATE_SERVICE_FOUND,
-
-		/**
-		 * {@link android.bluetooth.BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} failed for an unknown reason. The library is now using
-		 * {@link android.bluetooth.BluetoothAdapter#startDiscovery()} instead.
-		 *
-		 * @see BleManagerConfig#revertToClassicDiscoveryIfNeeded
-		 */
-		START_BLE_SCAN_FAILED__USING_CLASSIC,
-
-		/**
-		 * {@link android.bluetooth.BluetoothGatt#getConnectionState(BluetoothDevice)} says we're connected but we never tried to connect in the first place.
-		 * My theory is that this can happen on some phones when you quickly restart the app and the stack doesn't have
-		 * a chance to disconnect from the device entirely.
-		 */
-		CONNECTED_WITHOUT_EVER_CONNECTING,
-
-		/**
-		 * Similar in concept to {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh#RANDOM_EXCEPTION} but used when {@link android.os.DeadObjectException} is thrown.
-		 */
-		DEAD_OBJECT_EXCEPTION,
-
-		/**
-		 * The underlying native BLE stack enjoys surprising you with random exceptions. Every time a new one is discovered
-		 * it is wrapped in a try/catch and this {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} is dispatched.
-		 */
-		RANDOM_EXCEPTION,
-
-		/**
-		 * {@link android.bluetooth.BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} failed and {@link BleManagerConfig#revertToClassicDiscoveryIfNeeded} is <code>false</code>.
-		 *
-		 * @see BleManagerConfig#revertToClassicDiscoveryIfNeeded
-		 */
-		START_BLE_SCAN_FAILED,
-
-		/**
-		 * {@link android.bluetooth.BluetoothAdapter#startLeScan(BluetoothAdapter.LeScanCallback)} failed and {@link BleManagerConfig#revertToClassicDiscoveryIfNeeded} is <code>true</code>
-		 * so we try {@link android.bluetooth.BluetoothAdapter#startDiscovery()} but that also fails...fun!
-		 */
-		CLASSIC_DISCOVERY_FAILED,
-
-		/**
-		 * {@link android.bluetooth.BluetoothGatt#discoverServices()} failed right off the bat and returned false.
-		 */
-		SERVICE_DISCOVERY_IMMEDIATELY_FAILED,
-
-		/**
-		 * {@link android.bluetooth.BluetoothAdapter#disable()}, through {@link com.idevicesinc.sweetblue.BleManager#turnOff()}, is failing to complete.
-		 * We always end up back at {@link android.bluetooth.BluetoothAdapter#STATE_ON}.
-		 */
-		CANNOT_DISABLE_BLUETOOTH,
-
-		/**
-		 * {@link android.bluetooth.BluetoothAdapter#enable()}, through {@link com.idevicesinc.sweetblue.BleManager#turnOn()}, is failing to complete.
-		 * We always end up back at {@link android.bluetooth.BluetoothAdapter#STATE_OFF}. Opposite problem of {@link #CANNOT_DISABLE_BLUETOOTH}
-		 */
-		CANNOT_ENABLE_BLUETOOTH,
-
-		/**
-		 * Just a blanket case for when the library has to completely shrug its shoulders.
-		 */
-		UNKNOWN_BLE_ERROR;
-
-		/**
-		 * Returns the {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.Remedy} for this {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh}.
-		 */
-		public Remedy getRemedy() {
-			if (this.ordinal() >= CANNOT_DISABLE_BLUETOOTH.ordinal()) {
-				return Remedy.RESTART_PHONE;
-			} else if (this.ordinal() >= START_BLE_SCAN_FAILED.ordinal()) {
-				return Remedy.RESET_BLE;
-			} else {
-				return Remedy.WAIT_AND_SEE;
-			}
-		}
-	}
-
-	/**
-	 * The suggested remedy for each {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh}. This can be used as a proxy for the severity
-	 * of the issue.
-	 */
-	public static enum Remedy {
-		/**
-		 * Nothing you can really do, hopefully the library can soldier on.
-		 */
-		WAIT_AND_SEE,
-
-		/**
-		 * Calling {@link com.idevicesinc.sweetblue.BleManager#reset()} is probably in order.
-		 *
-		 * @see com.idevicesinc.sweetblue.BleManager#reset()
-		 */
-		RESET_BLE,
-
-		/**
-		 * Might want to notify your user that a phone restart is in order.
-		 */
-		RESTART_PHONE;
-	}
-
-	/
-			**
-			*
-	Struct passed
-	to
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager.UhOhListener#
-		onEvent(com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOhEvent)
-	}
-
-	.
-			*/
-
-	@Immutable
-	public static class UhOhEvent {
-		private final BleManager m_manager;
-		private final UhOh m_uhOh;
-
-		UhOhEvent(BleManager manager, UhOh uhoh) {
-			m_manager = manager;
-			m_uhOh = uhoh;
-		}
-
-		/**
-		 * The manager associated with the {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOhEvent}
-		 */
-		public BleManager manager() {
-			return m_manager;
-		}
-
-		/**
-		 * /**
-		 * Returns the type of {@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh} that occurred.
-		 */
-		public UhOh uhOh() {
-			return m_uhOh;
-		}
-
-
-		*Forwards
-
-		{
-			@link com.idevicesinc.sweetblue.BleManager.UhOhListener.UhOh#getRemedy()
-		}
-
-		.
-				*/
-
-		public Remedy remedy() {
-			return uhOh().getRemedy();
-		}
-
-		;
-
-		@Override
-		public String toString() {
-			return Utils.toString
-					(
-							this.getClass(),
-							"uhOh", uhOh(),
-							"remedy", remedy()
-					);
-		}
-	}
-
-
-	h(UhOh reason) {
 //		if( reason == UhOh.UNKNOWN_CONNECTION_ERROR )
 //		{
 //			m_connectionFailTracker = 0;
@@ -2419,195 +2371,11 @@ public class BleManager
 		m_uhOhThrottler.uhOh(reason);
 	}
 
-	@Overrid *
-		*
-	Provide an
-	implementation to
-
+	@Override public String toString()
 	{
-		@link com.idevicesinc.sweetblue.BleManager#
-		reset(com.idevicesinc.sweetblue.BleManager.ResetListener)
-	}
-
-	*
-	to be
-	notified when
-	a reset
-	operation is
-	complete.
-	*
-			*
-	@see
-	com.idevicesinc.sweetblue.BleManager#
-
-	reset(com.idevicesinc.sweetblue.BleManager.ResetListener)
-
-	*/
-
-	@com.idevicesinc.sweetblue.annotations.Lambda
-	public static interface ResetListener {
-		/**
-		 * The reset event, for now only fired when the reset is completed. Hopefully the bluetooth stack is OK now.
-		 */
-		void onEvent(final ResetEvent e);
-	}
-
-	/**
-	 * Enumeration of the progress of the reset.
-	 * More entries will be added in the future.
-	 */
-	public static enum Progress {
-		/**
-		 * The reset has completed successfully.
-		 */
-		COMPLETED;
-	}
-
-	/
-			**
-			*
-	Struct passed
-	to
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager.ResetListener#
-		onEvent(com.idevicesinc.sweetblue.BleManager.ResetListener.ResetEvent)
-	}
-
-	.
-			*/
-
-	@Immutable
-	public static class ResetEvent {
-		private final BleManager m_manager;
-		private final Progress m_progress;
-
-		ResetEvent(BleManager manager, Progress progress) {
-			m_manager = manager;
-			m_progress = progress;
-		}
-
-		/**
-		 * The {@link com.idevicesinc.sweetblue.BleManager} the reset was applied to.
-		 */
-		public BleManager manager() {
-			return m_manager;
-		}
-
-		/**
-		 * The progress of the reset.
-		 */
-		public Progress progress() {
-			return m_progress;
-		}
-
-		@Override
-		public String toString() {
-			return Utils.toString
-					(
-							this.getClass(),
-							"progress", progress()
-					);
-		}
-	}
-
-
-	e
-
-	public String toString() {
 		return m_stateTracker.toString();
 	}
-
-	public B*
-		*
-	Mostly only
-	for
-	SweetBlue library
-	developers.Provide an
-	implementation to
-	*
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager#
-		setListener_Assert(com.idevicesinc.sweetblue.BleManager.AssertListener)
-	}
-
-	to be
-	notified whenever
-	*
-	an assertion
-	fails through
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager#ASSERT(boolean,String)}
-
-	.
-			*/
-
-	@Advanced
-	@com.idevicesinc.sweetblue.annotations.Lambda
-	public static interface AssertListener {
-		/* Provides additional info about the circumstances surrounding the assert.
-		 */
-		void onEvent(final AssertEvent e);
-	}
-
-	pri
-
-	**
-			*
-	Struct passed
-	to
-
-	{
-		@link com.idevicesinc.sweetblue.BleManager.AssertListener#
-		onEvent(com.idevicesinc.sweetblue.BleManager.AssertListener.AssertEvent)
-	}
-
-	.
-			*/
-
-	@Immutable
-	public static class AssertEvent {
-		private final BleManager m_manager;
-		pr
-		private final String m_message;
-		ivate
-		final StackTraceElement[] m_stackTrace;
-
-		AssertEvent(BleManager manager, String message, StackTraceElement[] stackTrace) {
-			m_manager = manager;
-			m_message = message;
-			m_stackTrace = stackTrace;
-		}
-
-		/**
-		 * The {@link com.idevicesinc.sweetblue.BleManager} instance for your application.
-		 */
-		public BleManager manager(){  return m_manager;  }
-
-/**
-			 * Message associated with the assert, or an empty string.
-			 */
-			public String message(){  return m_message;  }
-
-			/**
-			 * Stack trace leading up to the assert.
-			 */
-			public StackTraceElement[] stackTrace(){  return m_stackTrace;  }
-
-			@Override public String toString()
-			{
-				return Utils.toString
-				(
-					this.getClass(),
-					"message",			message(),
-					"stackTrace",		stackTrace()
-				);
-			}
-		}
-
-		/**vatleServer openBleServer( final List<BluetoothGattService> gattServices, BleServer.ReadOrWriteRequestListener listener ) {
+	public BleServer openBleServer( final List<BluetoothGattService> gattServices, BleServer.ReadOrWriteRequestListener listener ) {
 		BleServer bleServer = new BleServer( this );
 		bleServer.openGattServer( m_context, gattServices, listener );
 		m_serverMngr.add( bleServer );
