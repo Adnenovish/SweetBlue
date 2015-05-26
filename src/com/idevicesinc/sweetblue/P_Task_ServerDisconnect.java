@@ -1,17 +1,24 @@
 package com.idevicesinc.sweetblue;
 
 public class P_Task_ServerDisconnect extends PA_Task_RequiresBleOn {
-	
+
+    private final BleServer m_server;
+
 	public P_Task_ServerDisconnect( BleServer server, I_StateListener listener ) {
 		super( server, listener );
-		
-	}
+        m_server = server;
+
+    }
 
 	@Override
-	void execute() {
-		
-		if( getServer() == null )
-		{
+    protected BleTask getTaskType() {
+        return null;
+    }
+
+    @Override
+    void execute() {
+
+        if (m_server == null) {
 			m_logger.w("Already disconnected and server==null!");
 			
 			redundant();
@@ -25,8 +32,8 @@ public class P_Task_ServerDisconnect extends PA_Task_RequiresBleOn {
 			
 			return;
 		}
-		getServer().getNative().cancelConnection( getServer().getDevice().getNative() );
-	}
+        m_server.getNative().cancelConnection(m_server.getDevice().getNative());
+    }
 
 	@Override
 	public PE_TaskPriority getPriority() {

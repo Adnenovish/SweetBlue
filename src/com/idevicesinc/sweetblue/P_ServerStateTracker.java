@@ -1,33 +1,21 @@
 package com.idevicesinc.sweetblue;
 
-<<<<<<< HEAD
 import com.idevicesinc.sweetblue.utils.State;
-=======
-import com.idevicesinc.sweetblue.utils.BitwiseEnum;
->>>>>>> b406005... Source control mgmt
 
 public class P_ServerStateTracker extends PA_StateTracker {
 
-	private BleServer.StateListener m_stateListener;
 	private final BleServer m_server;
-	
+	private BleServer.StateListener m_stateListener;
+
 	P_ServerStateTracker(BleServer server)
 	{
-<<<<<<< HEAD
-		super(server.getManager().getLogger(), BleDeviceState.values());
-		
+		super(BleDeviceState.values(), false);
+
 		m_server = server;
-		
-		set(E_Intent.IMPLICIT, BleDeviceState.UNDISCOVERED, true, BleDeviceState.DISCONNECTED, true);
-=======
-		super(server.getManager().getLogger());
-		
-		m_server = server;
-		
-		set(BleDeviceState.UNDISCOVERED, true, BleDeviceState.DISCONNECTED, true);
->>>>>>> b406005... Source control mgmt
+
+		set(E_Intent.INTENTIONAL, 2, BleDeviceState.UNDISCOVERED, true, BleDeviceState.DISCONNECTED, true);
 	}
-	
+
 	public void setListener(BleServer.StateListener listener)
 	{
 		if( listener != null )
@@ -40,30 +28,23 @@ public class P_ServerStateTracker extends PA_StateTracker {
 		}
 	}
 
-<<<<<<< HEAD
-	@Override protected void onStateChange(int oldStateBits, int newStateBits, int intentMask)
-=======
-	@Override protected void onStateChange(int oldStateBits, int newStateBits)
->>>>>>> b406005... Source control mgmt
+	@Override
+	protected void onStateChange(int oldStateBits, int newStateBits, int intentMask, int status)
 	{
 		if( m_stateListener != null )
 		{
 			m_stateListener.onStateChange(m_server, oldStateBits, newStateBits);
 		}
-		
+
 		if( m_server.getManager().m_defaultServerStateListener != null )
 		{
 			m_server.getManager().m_defaultServerStateListener.onStateChange(m_server, oldStateBits, newStateBits);
 		}
-		
+
 //		m_device.getManager().getLogger().e(this.toString());
 	}
 
-<<<<<<< HEAD
 	@Override protected void append_assert(State newState)
-=======
-	@Override protected void append_assert(BitwiseEnum newState)
->>>>>>> b406005... Source control mgmt
 	{
 		if( newState.ordinal() > BleDeviceState.CONNECTING.ordinal() )
 		{
@@ -74,7 +55,7 @@ public class P_ServerStateTracker extends PA_StateTracker {
 //			m_device.getManager().ASSERT(m_device.m_nativeWrapper.isNativelyConnected());
 		}
 	}
-	
+
 	@Override public String toString()
 	{
 		return super.toString(BleDeviceState.values());

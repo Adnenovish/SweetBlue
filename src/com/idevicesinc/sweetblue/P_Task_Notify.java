@@ -1,7 +1,5 @@
 package com.idevicesinc.sweetblue;
 
-import java.util.UUID;
-
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 
@@ -10,6 +8,8 @@ import com.idevicesinc.sweetblue.BleDevice.ReadWriteListener.Target;
 import com.idevicesinc.sweetblue.BleServer.ReadOrWriteRequestListener;
 import com.idevicesinc.sweetblue.BleServer.ReadOrWriteRequestListener.Result;
 import com.idevicesinc.sweetblue.PA_Task.I_StateListener;
+
+import java.util.UUID;
 
 public class P_Task_Notify extends PA_Task implements I_StateListener {
 
@@ -43,15 +43,20 @@ public class P_Task_Notify extends PA_Task implements I_StateListener {
 	}
 
 	@Override
-	void execute() {
+    protected BleTask getTaskType() {
+        //TODO: implement getTaskType
+        return null;
+    }
+
+    @Override
+    void execute() {
 		if( !m_characteristic.setValue(m_data) )
 		{
 			fail(Status.FAILED_TO_SET_VALUE_ON_TARGET, Result.GATT_STATUS_NOT_APPLICABLE, Target.CHARACTERISTIC, m_characteristic.getUuid(), Result.NON_APPLICABLE_UUID);
 			
 			return;
 		}
-		if( !getServer().getNative().notifyCharacteristicChanged( m_device, m_characteristic, m_confirm ) )
-		{
+        if (!m_server.getNative().notifyCharacteristicChanged(m_device, m_characteristic, m_confirm)) {
 			fail(Status.FAILED_TO_SEND_OUT, Result.GATT_STATUS_NOT_APPLICABLE, Target.CHARACTERISTIC, m_characteristic.getUuid(), Result.NON_APPLICABLE_UUID);
 			
 			return;

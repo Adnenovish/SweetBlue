@@ -17,6 +17,10 @@ abstract class PA_Task_RequiresBleOn extends PA_Task
 		super(device, listener);
 	}
 
+    public PA_Task_RequiresBleOn(BleServer server, I_StateListener listener) {
+        super(server, listener);
+    }
+
 	@Override protected boolean isExecutable()
 	{
 		return super.isExecutable() && BleManagerState.ON.overlaps(getManager().getNativeStateMask());

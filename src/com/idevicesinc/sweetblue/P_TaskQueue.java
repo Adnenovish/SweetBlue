@@ -1,18 +1,18 @@
 package com.idevicesinc.sweetblue;
 
-import java.util.ArrayList;
-
 import android.os.Handler;
 import android.os.Looper;
+
+import java.util.ArrayList;
 
 class P_TaskQueue
 {
 	private final ArrayList<PA_Task> m_queue = new ArrayList<PA_Task>();
-	private PA_Task m_current;
-	private long m_updateCount;
 	private final P_Logger m_logger;
 	private final BleManager m_mngr;
-	private double m_time = 0.0;
+    private PA_Task m_current;
+    private long m_updateCount;
+    private double m_time = 0.0;
 	
 	private Handler m_executeHandler = null;
 	
@@ -155,16 +155,19 @@ class P_TaskQueue
 	public void add(final PA_Task newTask)
 	{
 		newTask.init();
-		
-		m_mngr.getUpdateLoop().postIfNeeded(new Runnable()
-		{
-			@Override public void run()
-			{
-						if	(	tryCancellingCurrentTask	(newTask)	){}
-				else	if	(	tryInterruptingCurrentTask	(newTask) 	){}
-				else	if	(	tryInsertingIntoQueue		(newTask) 	){}
-				else		{	addToBack					(newTask);	};;
-			}
+
+        m_mngr.getUpdateLoop().postIfNeeded(new Runnable() {
+            @Override
+            public void run() {
+                if (tryCancellingCurrentTask(newTask)) {
+                } else if (tryInterruptingCurrentTask(newTask)) {
+                } else if (tryInsertingIntoQueue(newTask)) {
+                } else {
+                    addToBack(newTask);
+                }
+                ;
+                ;
+            }
 		});
 		
 	}
@@ -270,9 +273,13 @@ class P_TaskQueue
 	{
 		return tryEndingTask(taskClass, null, device, PE_TaskState.SUCCEEDED);
 	}
-	
-	
-	public boolean fail(Class<? extends PA_Task> taskClass, BleManager manager)
+
+    public boolean succeed(Class<? extends PA_Task> taskClass, BleServer server) {
+        return tryEndingTask(taskClass, server.getManager(), server.getDevice(), PE_TaskState.SUCCEEDED);
+    }
+
+
+    public boolean fail(Class<? extends PA_Task> taskClass, BleManager manager)
 	{
 		return tryEndingTask(taskClass, manager, null, PE_TaskState.FAILED);
 	}
@@ -392,7 +399,15 @@ class P_TaskQueue
 		{
 			return (T) getCurrent();
 		}
-		
+
+        return null;
+    }
+
+    public <T extends PA_Task> T getCurrent(Class<? extends PA_Task> taskClass, BleServer server) {
+        if (PU_TaskQueue.isMatch(getCurrent(), taskClass, server.getManager(), null)) {
+            return (T) getCurrent();
+        }
+
 		return null;
 	}
 	

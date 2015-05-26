@@ -1,37 +1,27 @@
 package com.idevicesinc.sweetblue;
 
-import java.util.UUID;
-
 import android.os.Handler;
 
 import com.idevicesinc.sweetblue.BleDeviceConfig.TimeoutRequestFilter.TimeoutRequestEvent;
 import com.idevicesinc.sweetblue.utils.Interval;
 import com.idevicesinc.sweetblue.utils.Uuids;
 
+import java.util.UUID;
+
 abstract class PA_Task
 {
-	static interface I_StateListener
-	{
-		void onStateChange(PA_Task task, PE_TaskState state);
-	}
-
-	private final BleDeviceConfig.TimeoutRequestFilter.TimeoutRequestEvent s_timeoutRequestEvent = new TimeoutRequestEvent();
-
-	private 	  BleDevice m_device;
+    protected final P_Logger m_logger;
+    private final BleDeviceConfig.TimeoutRequestFilter.TimeoutRequestEvent s_timeoutRequestEvent = new TimeoutRequestEvent();
 	private final BleManager m_manager;
-
-	private double m_timeout;
+    private final I_StateListener m_stateListener;
+    private BleDevice m_device;
+    private double m_timeout;
 	private double m_executionDelay = 0.0;
-
 	private long m_resetableExecuteStartTime = 0;
-	//	private double m_totalTimeExecuting = 0.0;
+    //	private double m_totalTimeQueuedAndArmedAndExecuting = 0.0;
+    //	private double m_totalTimeExecuting = 0.0;
 	private double m_totalTimeArmedAndExecuting = 0.0;
-//	private double m_totalTimeQueuedAndArmedAndExecuting = 0.0;
-
 	private double m_addedToQueueTime = -1.0;
-
-	private final I_StateListener m_stateListener;
-
 	private PE_TaskState m_state = null;
 
 	private P_TaskQueue m_queue;
@@ -44,13 +34,6 @@ abstract class PA_Task
 
 	private long m_timeCreated;
 	private long m_timeExecuted;
-
-	private boolean m_softlyCancelled = false;
-
-	protected final P_Logger m_logger;
-
-	private int m_ordinal = -1; // until added to the queue and assigned an actual ordinal.
-
 	private final Runnable m_executeRunnable = new Runnable()
 	{
 		@Override public void run()
@@ -63,6 +46,8 @@ abstract class PA_Task
 			}
 		}
 	};
+    private boolean m_softlyCancelled = false;
+    private int m_ordinal = -1; // until added to the queue and assigned an actual ordinal.
 
 	public PA_Task(BleDevice device, I_StateListener listener)
 	{
@@ -89,6 +74,21 @@ abstract class PA_Task
 			m_stateListener = listener;
 		}
 	}
+
+    public PA_Task(BleServer server, I_StateListener listener) {
+        m_device = null;
+        m_manager = server.getManager();
+//		m_maxRetries = 0;
+        m_logger = m_manager.getLogger();
+        m_timeCreated = System.currentTimeMillis();
+
+        if (listener == null && this instanceof I_StateListener) {
+            //--- DRK > Can't pass this pointer from subclass up through super(), otherwise that would be cleaner.
+            m_stateListener = (I_StateListener) this;
+        } else {
+            m_stateListener = listener;
+        }
+    }
 
 	protected abstract BleTask getTaskType();
 
@@ -127,6 +127,10 @@ abstract class PA_Task
 		setState(PE_TaskState.CREATED);
 	}
 
+    PE_TaskState getState() {
+        return m_state;
+    }
+
 	private void setState(PE_TaskState newState)
 	{
 		if( !m_manager.ASSERT(newState != m_state) )  return;
@@ -152,11 +156,6 @@ abstract class PA_Task
 		}
 
 		if( m_stateListener != null )  m_stateListener.onStateChange(this, m_state);
-	}
-
-	PE_TaskState getState()
-	{
-		return m_state;
 	}
 
 	int getOrdinal()
@@ -460,5 +459,9 @@ abstract class PA_Task
 	public boolean isExplicit()
 	{
 		return false;
-	}
+    }
+
+    static interface I_StateListener {
+        void onStateChange(PA_Task task, PE_TaskState state);
+    }
 }

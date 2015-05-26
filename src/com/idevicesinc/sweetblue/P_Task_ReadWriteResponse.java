@@ -8,8 +8,8 @@ public class P_Task_ReadWriteResponse extends PA_Task_RequiresConnection impleme
 	private final BleServer m_server;
 	private final Response m_response;
 	public P_Task_ReadWriteResponse( BleServer server, I_StateListener listener, Response response ) {
-		super( server.getDevice(), BleDeviceConfig.DEFAULT_TASK_TIMEOUT, listener);
-		m_server = server;
+        super(server.getDevice(), listener);
+        m_server = server;
 		m_response = response;
 	}
 
@@ -32,8 +32,14 @@ public class P_Task_ReadWriteResponse extends PA_Task_RequiresConnection impleme
 		return PE_TaskPriority.FOR_IMPLICIT_BONDING_AND_CONNECTING; //PE_TaskPriority.FOR_NORMAL_READS_WRITES;
 	}
 
-	@Override 
-	protected boolean isExecutable()
+    @Override
+    protected BleTask getTaskType() {
+        //TODO: implement getTaskType
+        return null;
+    }
+
+    @Override
+    protected boolean isExecutable()
 	{
 		return true;
 	}
