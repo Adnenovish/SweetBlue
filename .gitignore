@@ -16,7 +16,7 @@ samples/hello_ble/.settings/org.eclipse.jdt.core.prefs
 samples/ble_util/.settings/org.eclipse.jdt.core.prefs
 
 sweetblue.iml
-AndroidManifest.xml
+#AndroidManifest.xml
 scripts
-build.gradle
-proguard-rules.pro
+#build.gradle
+#proguard-rules.pro
