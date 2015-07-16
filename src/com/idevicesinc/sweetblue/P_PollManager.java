@@ -55,7 +55,7 @@ class P_PollManager
 		{
 			m_entry.onSuccessOrFailure();
 
-			super.onResult(m_overrideListener, result);
+			super.onEvent(m_overrideListener, result);
 		}
 	}
 	
@@ -68,26 +68,26 @@ class P_PollManager
 			super(readWriteListener, handler, postToMain);
 		}
 		
-		@Override public void onEvent(ReadWriteEvent result)
+		@Override public void onEvent(ReadWriteEvent event)
 		{
-			if( result.status() == Status.SUCCESS )
+			if( event.status() == Status.SUCCESS )
 			{
-				if( m_lastValue == null || !Arrays.equals(m_lastValue, result.data()) )
+				if( event.type().isNativeNotification() || m_lastValue == null || !Arrays.equals(m_lastValue, event.data()) )
 				{
-					super.onEvent(result);
+					super.onEvent(event);
 				}
 				else
 				{
 					m_entry.onSuccessOrFailure();
 				}
 				
-				m_lastValue = result.data();
+				m_lastValue = event.data();
 			}
 			else
 			{
 				m_lastValue = null;
 				
-				super.onEvent(result);
+				super.onEvent(event);
 			}
 		}
 	}
@@ -144,7 +144,7 @@ class P_PollManager
 				usingNotify == m_usingNotify																			&&
 				(m_serviceUuid == null || serviceUuid == null || m_serviceUuid.equals(serviceUuid))						&&
 				charUuid.equals(m_charUuid)																				&&
-				(interval_nullable == null || interval_nullable == m_interval)											&&
+				(Interval.isDisabled(interval_nullable) || interval_nullable == m_interval)								&&
 				(readWriteListener_nullable == null || m_pollingReadListener.hasListener(readWriteListener_nullable))	 ;
 		}
 		
