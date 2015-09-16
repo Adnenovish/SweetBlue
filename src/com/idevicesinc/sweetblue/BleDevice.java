@@ -170,7 +170,10 @@ public class BleDevice implements UsesCustomNull
 			 * The operation failed in a "normal" fashion, at least relative to all the other strange ways an operation can fail. This means for
 			 * example that {@link BluetoothGattCallback#onCharacteristicRead(BluetoothGatt, BluetoothGattCharacteristic, int)}
 			 * returned a status code that was not zero. This could mean the device went out of range, was turned off, signal was disrupted,
-			 * whatever. Often this means that the device is about to become {@link BleDeviceState#DISCONNECTED}.
+			 * whatever. Often this means that the device is about to become {@link BleDeviceState#DISCONNECTED}. {@link ReadWriteEvent#gattStatus()}
+			 * will most likely be non-zero, and you can check the static fields in {@link BleStatuses} for more information.
+			 *
+			 * @see ReadWriteEvent#gattStatus()
 			 */
 			REMOTE_GATT_FAILURE,
 
@@ -1806,6 +1809,7 @@ public class BleDevice implements UsesCustomNull
 	private static final ArrayList<UUID> EMPTY_LIST = new ArrayList<UUID>();
 
 	static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+	static final FutureData EMPTY_FUTURE_DATA = new PresentData(EMPTY_BYTE_ARRAY);
 
 	final Object m_threadLock = new Object();
 
@@ -3355,7 +3359,7 @@ public class BleDevice implements UsesCustomNull
 	 */
 	public ReadWriteListener.ReadWriteEvent write(final UUID characteristicUuid, final byte[] data)
 	{
-		return this.write(characteristicUuid, data, (ReadWriteListener) null);
+		return this.write(characteristicUuid, new PresentData(data), (ReadWriteListener) null);
 	}
 
 	/**
@@ -3369,7 +3373,7 @@ public class BleDevice implements UsesCustomNull
 	{
 		final UUID serviceUuid = null;
 
-		return write_internal(serviceUuid, characteristicUuid, data, new P_WrappingReadWriteListener(listener, getManager().m_mainThreadHandler, getManager().m_config.postCallbacksToMainThread));
+		return write(serviceUuid, characteristicUuid, new PresentData(data), listener);
 	}
 
 	/**
@@ -3377,7 +3381,7 @@ public class BleDevice implements UsesCustomNull
 	 */
 	public ReadWriteListener.ReadWriteEvent write(final UUID serviceUuid, final UUID characteristicUuid, final byte[] data)
 	{
-		return this.write(serviceUuid, characteristicUuid, data, (ReadWriteListener) null);
+		return this.write(serviceUuid, characteristicUuid, new PresentData(data), (ReadWriteListener) null);
 	}
 
 	/**
@@ -3385,7 +3389,50 @@ public class BleDevice implements UsesCustomNull
 	 */
 	public ReadWriteListener.ReadWriteEvent write(final UUID serviceUuid, final UUID characteristicUuid, final byte[] data, final ReadWriteListener listener)
 	{
-		return write_internal(serviceUuid, characteristicUuid, data, new P_WrappingReadWriteListener(listener, getManager().m_mainThreadHandler, getManager().m_config.postCallbacksToMainThread));
+		return write(serviceUuid, characteristicUuid, new PresentData(data), new P_WrappingReadWriteListener(listener, getManager().m_mainThreadHandler, getManager().m_config.postCallbacksToMainThread));
+	}
+
+
+	/**
+	 * Writes to the device without a callback.
+	 *
+	 * @return (same as {@link #write(UUID, FutureData, ReadWriteListener)}).
+	 *
+	 * @see #write(UUID, FutureData, ReadWriteListener)
+	 */
+	public ReadWriteListener.ReadWriteEvent write(final UUID characteristicUuid, final FutureData futureData)
+	{
+		return this.write(characteristicUuid, futureData, (ReadWriteListener) null);
+	}
+
+	/**
+	 * Writes to the device with a callback.
+	 *
+	 * @return (see similar comment for return value of {@link #connect(BleTransaction.Auth, BleTransaction.Init, StateListener, ConnectionFailListener)}).
+	 *
+	 * @see #write(UUID, FutureData)
+	 */
+	public ReadWriteListener.ReadWriteEvent write(final UUID characteristicUuid, final FutureData futureData, final ReadWriteListener listener)
+	{
+		final UUID serviceUuid = null;
+
+		return write(serviceUuid, characteristicUuid, futureData, listener);
+	}
+
+	/**
+	 * Overload of {@link #write(UUID, FutureData)} for when you have characteristics with identical uuids under different services.
+	 */
+	public ReadWriteListener.ReadWriteEvent write(final UUID serviceUuid, final UUID characteristicUuid, final FutureData futureData)
+	{
+		return this.write(serviceUuid, characteristicUuid, futureData, (ReadWriteListener) null);
+	}
+
+	/**
+	 * Overload of {@link #write(UUID, FutureData, ReadWriteListener)} for when you have characteristics with identical uuids under different services.
+	 */
+	public ReadWriteListener.ReadWriteEvent write(final UUID serviceUuid, final UUID characteristicUuid, final FutureData futureData, final ReadWriteListener listener)
+	{
+		return write_internal(serviceUuid, characteristicUuid, futureData, new P_WrappingReadWriteListener(listener, getManager().m_mainThreadHandler, getManager().m_config.postCallbacksToMainThread));
 	}
 
 	/**
@@ -3408,7 +3455,7 @@ public class BleDevice implements UsesCustomNull
 	 */
 	public ReadWriteListener.ReadWriteEvent readRssi(final ReadWriteListener listener)
 	{
-		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(Uuids.INVALID, Uuids.INVALID, EMPTY_BYTE_ARRAY, Type.READ, ReadWriteListener.Target.RSSI);
+		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(Uuids.INVALID, Uuids.INVALID, EMPTY_FUTURE_DATA, Type.READ, ReadWriteListener.Target.RSSI);
 
 		if (earlyOutResult != null)
 		{
@@ -4057,6 +4104,19 @@ public class BleDevice implements UsesCustomNull
 	}
 
 	/**
+	 * Overload of {@link #clearHistoricalData(UUID)} that just calls that method multiple times.
+	 */
+	public void clearHistoricalData(final UUID ... uuids)
+	{
+		for( int i = 0; i < uuids.length; i++ )
+		{
+			final UUID ith = uuids[i];
+
+			clearHistoricalData(ith);
+		}
+	}
+
+	/**
 	 * Clears the first <code>count</code> number of {@link com.idevicesinc.sweetblue.utils.HistoricalData} tracked by this device for a particular
 	 * characteristic {@link java.util.UUID}.
 	 *
@@ -4077,9 +4137,9 @@ public class BleDevice implements UsesCustomNull
 	 * @see com.idevicesinc.sweetblue.BleDeviceConfig.DefaultHistoricalDataLogFilter
 	 */
 	@com.idevicesinc.sweetblue.annotations.Advanced
-	public void clearHistoricalData(final UUID characteristicUuid, final EpochTimeRange range)
+	public void clearHistoricalData(final UUID uuid, final EpochTimeRange range)
 	{
-		clearHistoricalData(characteristicUuid, range, Long.MAX_VALUE);
+		clearHistoricalData(uuid, range, Long.MAX_VALUE);
 	}
 
 	/**
@@ -4090,11 +4150,11 @@ public class BleDevice implements UsesCustomNull
 	 * @see com.idevicesinc.sweetblue.BleDeviceConfig.DefaultHistoricalDataLogFilter
 	 */
 	@com.idevicesinc.sweetblue.annotations.Advanced
-	public void clearHistoricalData(final UUID characteristicUuid, final EpochTimeRange range, final long count)
+	public void clearHistoricalData(final UUID uuid, final EpochTimeRange range, final long count)
 	{
 		if( isNull() ) return;
 
-		m_historicalDataMngr.delete(characteristicUuid, range, count, /*memoryOnly=*/false);
+		m_historicalDataMngr.delete(uuid, range, count, /*memoryOnly=*/false);
 	}
 
 	/**
@@ -4391,7 +4451,7 @@ public class BleDevice implements UsesCustomNull
 	 */
 	public ReadWriteListener.ReadWriteEvent enableNotify(final UUID serviceUuid, final UUID characteristicUuid, final Interval forceReadTimeout, final ReadWriteListener listener)
 	{
-		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, EMPTY_BYTE_ARRAY, Type.ENABLING_NOTIFICATION, ReadWriteListener.Target.CHARACTERISTIC);
+		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, EMPTY_FUTURE_DATA, Type.ENABLING_NOTIFICATION, ReadWriteListener.Target.CHARACTERISTIC);
 
 		if (earlyOutResult != null)
 		{
@@ -4594,7 +4654,13 @@ public class BleDevice implements UsesCustomNull
 	public boolean performOta(final BleTransaction.Ota txn)
 	{
 		if( performTransaction_earlyOut(txn) )		return false;
-		if (is(PERFORMING_OTA))						return false;
+
+		if ( is(PERFORMING_OTA) )
+		{
+			//--- DRK > The strictest and maybe best way to early out here, but as far as expected behavior this may be better.
+			//---		In the end it's a judgement call, what's best API-wise with user expectations.
+			m_txnMngr.cancelOtaTransaction();
+		}
 
 		m_txnMngr.startOta(txn);
 
@@ -4626,7 +4692,7 @@ public class BleDevice implements UsesCustomNull
 	{
 		if ( txn == null )							return true;
 		if (isNull())								return true;
-		if (!is(INITIALIZED))						return true;
+		if (!is_internal(INITIALIZED))				return true;
 		if ( m_txnMngr.getCurrent() != null )		return true;
 
 		return false;
@@ -4696,9 +4762,9 @@ public class BleDevice implements UsesCustomNull
 	}
 
 	// PA_StateTracker getStateTracker(){ return m_stateTracker; }
-	BleTransaction getFirmwareUpdateTxn()
+	BleTransaction getOtaTxn()
 	{
-		return m_txnMngr.m_firmwareUpdateTxn;
+		return m_txnMngr.m_otaTxn;
 	}
 
 	P_PollManager getPollManager()
@@ -4711,20 +4777,24 @@ public class BleDevice implements UsesCustomNull
 		return m_serviceMngr;
 	}
 
-	void onNewlyDiscovered(List<UUID> advertisedServices_nullable, int rssi, byte[] scanRecord_nullable, final BleDeviceOrigin origin)
+	void onNewlyDiscovered(final BluetoothDevice device_native, List<UUID> advertisedServices_nullable, int rssi, byte[] scanRecord_nullable, final BleDeviceOrigin origin)
 	{
 		m_origin_latest = origin;
 
 		clear_discovery();
+
+		m_nativeWrapper.updateNativeDevice(device_native);
 
 		onDiscovered_private(advertisedServices_nullable, rssi, scanRecord_nullable);
 
 		stateTracker_main().update(E_Intent.UNINTENTIONAL, BleStatuses.GATT_STATUS_NOT_APPLICABLE, m_bondMngr.getNativeBondingStateOverrides(), UNDISCOVERED, false, DISCOVERED, true, ADVERTISING, origin==BleDeviceOrigin.FROM_DISCOVERY, DISCONNECTED, true);
 	}
 
-	void onRediscovered(List<UUID> advertisedServices_nullable, int rssi, byte[] scanRecord_nullable, final BleDeviceOrigin origin)
+	void onRediscovered(final BluetoothDevice device_native, List<UUID> advertisedServices_nullable, int rssi, byte[] scanRecord_nullable, final BleDeviceOrigin origin)
 	{
 		m_origin_latest = origin;
+
+		m_nativeWrapper.updateNativeDevice(device_native);
 
 		onDiscovered_private(advertisedServices_nullable, rssi, scanRecord_nullable);
 
@@ -5294,6 +5364,8 @@ public class BleDevice implements UsesCustomNull
 		//--- DRK > Fringe case bail out in case user calls disconnect() in state change for short term reconnect.
 		if (isDisconnectedAfterReconnectingShortTermStateCallback)
 		{
+			m_txnMngr.cancelAllTransactions();
+			
 			return;
 		}
 
@@ -5307,6 +5379,8 @@ public class BleDevice implements UsesCustomNull
 			{
 				softlyCancelTasks(overrideOrdinal);
 			}
+
+			m_txnMngr.cancelAllTransactions();
 
 			return;
 		}
@@ -5420,7 +5494,7 @@ public class BleDevice implements UsesCustomNull
 
 	ReadWriteListener.ReadWriteEvent read_internal(final UUID serviceUuid, final UUID characteristicUuid, final Type type, final ReadWriteListener listener)
 	{
-		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, EMPTY_BYTE_ARRAY, type, ReadWriteListener.Target.CHARACTERISTIC);
+		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, EMPTY_FUTURE_DATA, type, ReadWriteListener.Target.CHARACTERISTIC);
 
 		if (earlyOutResult != null)
 		{
@@ -5438,7 +5512,7 @@ public class BleDevice implements UsesCustomNull
 		return NULL_READWRITE_EVENT();
 	}
 
-	ReadWriteListener.ReadWriteEvent write_internal(final UUID serviceUuid, final UUID characteristicUuid, final byte[] data, final P_WrappingReadWriteListener listener)
+	ReadWriteListener.ReadWriteEvent write_internal(final UUID serviceUuid, final UUID characteristicUuid, final FutureData data, final P_WrappingReadWriteListener listener)
 	{
 		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, data, Type.WRITE, ReadWriteListener.Target.CHARACTERISTIC);
 
@@ -5460,7 +5534,7 @@ public class BleDevice implements UsesCustomNull
 
 	private ReadWriteListener.ReadWriteEvent disableNotify_private(UUID serviceUuid, UUID characteristicUuid, Double forceReadTimeout, ReadWriteListener listener)
 	{
-		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, EMPTY_BYTE_ARRAY, Type.DISABLING_NOTIFICATION, ReadWriteListener.Target.CHARACTERISTIC);
+		final ReadWriteEvent earlyOutResult = m_serviceMngr.getEarlyOutEvent(serviceUuid, characteristicUuid, EMPTY_FUTURE_DATA, Type.DISABLING_NOTIFICATION, ReadWriteListener.Target.CHARACTERISTIC);
 
 		if (earlyOutResult != null)
 		{
