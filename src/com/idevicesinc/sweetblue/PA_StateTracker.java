@@ -3,9 +3,9 @@ package com.idevicesinc.sweetblue;
 import com.idevicesinc.sweetblue.utils.State;
 import com.idevicesinc.sweetblue.utils.Utils;
 
-abstract class PA_StateTracker
+public abstract class PA_StateTracker
 {
-	static enum E_Intent
+	public static enum E_Intent
 	{
 		INTENTIONAL, UNINTENTIONAL;
 		

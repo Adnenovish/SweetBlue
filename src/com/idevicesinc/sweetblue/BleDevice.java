@@ -1943,7 +1943,7 @@ public class BleDevice implements UsesCustomNull
 		return m_stateTracker;
 	}
 
-	void stateTracker_updateBoth(E_Intent intent, int status, Object ... statesAndValues)
+	public void stateTracker_updateBoth(E_Intent intent, int status, Object ... statesAndValues)
 	{
 		m_stateTracker_shortTermReconnect.update(intent, status, statesAndValues);
 		stateTracker_main().update(intent, status, statesAndValues);
@@ -5041,7 +5041,7 @@ public class BleDevice implements UsesCustomNull
 		}
 	}
 
-	private void getServices(Object... extraFlags)
+	public void getServices(Object... extraFlags)
 	{
 		if (!m_nativeWrapper.isNativelyConnected())
 		{
